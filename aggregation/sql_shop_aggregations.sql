@@ -41,6 +41,20 @@ FROM customers c
 WHERE o.status = 'paid'
 GROUP BY c.city
 
+SELECT c.id, c.full_name, COUNT(*) AS paid_orders
+FROM customers c
+         JOIN orders o ON o.customer_id = c.id
+WHERE o.status = 'paid'
+GROUP BY c.id, c.full_name
+HAVING COUNT(*) > 1;
+
+SELECT c.name,SUM(CASE WHEN o.status = 'paid' THEN oi.qty ELSE 0 END) as paid_orders
+FROM categories c
+         JOIN products p  ON p.category_id = c.id
+         JOIN order_items oi ON oi.product_id = p.id
+         JOIN orders o ON oi.order_id = o.id
+GROUP BY c.name
+
 --CASE
 SELECT c.id,c.full_name,COUNT(o.id) as all_orders,
        COUNT(CASE WHEN o.status = 'paid' THEN 1 END ) as paid_orders,
@@ -68,3 +82,20 @@ FROM orders o;
 
 SELECT COUNT(CASE WHEN o.status = 'paid' THEN 1 END) AS paid_order_count
 FROM orders o;
+
+
+SELECT COUNT(*) as total_count ,
+       COUNT (CASE WHEN o.created_at >='2026-10-01' AND
+                        o.created_at<'2026-11-01' THEN 1 END) as october_orders_count
+FROM orders o
+
+
+
+SELECT c.id,c.full_name,COUNT(CASE WHEN o.status = 'pending' THEN 1 END) AS pending_orders
+FROM customers c
+         LEFT JOIN orders o ON o.customer_id = c.id
+GROUP BY c.id
+
+
+
+
