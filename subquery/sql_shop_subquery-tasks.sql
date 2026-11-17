@@ -153,3 +153,7 @@ WHERE gg.total >= (SELECT MAX(total)
                                      JOIN orders o ON o.customer_id = c.id AND o.status = 'paid'
                                      JOIN order_items oi ON oi.order_id = o.id
                             GROUP BY c.id,c.full_name) as cs)
+
+
+
+SELECT order_id

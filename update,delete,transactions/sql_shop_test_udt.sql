@@ -106,3 +106,21 @@ WHERE name = 'Simsiz siçan';
 ROLLBACK ;
 
 
+
+UPDATE products p
+SET price = l.unit_price
+    FROM (SELECT d.product_id,d.last_sold,s.unit_price
+      FROM (SELECT t.product_id, max(t.created_at) as last_sold
+            FROM (SELECT o.id as order_id, oi.product_id, oi.unit_price, o.created_at
+                  FROM orders o
+                           JOIN order_items oi ON oi.order_id = o.id
+                  WHERE o.status = 'paid') as t
+            GROUP BY t.product_id) as d
+               JOIN (SELECT o.id as order_id, oi.product_id, oi.unit_price, o.created_at
+                     FROM orders o
+                              JOIN order_items oi ON oi.order_id = o.id
+                     WHERE o.status = 'paid') as s ON (d.product_id,d.last_sold) = (s.product_id,s.created_at)) as l
+WHERE p.id = l.product_id AND p.price != l.unit_price
+    RETURNING p.name, p.price;
+COMMIT
+

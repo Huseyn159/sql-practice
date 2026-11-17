@@ -97,5 +97,24 @@ FROM customers c
 GROUP BY c.id
 
 
+--mixed practice
 
+--her musterinin ilk sifarisi
+
+SELECT t.id,t.full_name,o.id,o.created_at as first_order
+FROM (SELECT c.id,c.full_name,MIN(o.created_at) as first_order
+      FROM customers c
+               JOIN orders o ON o.customer_id = c.id
+      GROUP BY c.id, c.full_name) as t
+         JOIN orders o ON o.created_at = t.first_order AND o.customer_id = t.id
+
+
+
+SELECT o.customer_id,o.id as order_id,o.created_at as first_order
+FROM orders o
+WHERE (o.customer_id,o.created_at) IN (SELECT o.customer_id,MIN(o.created_at)
+                                       FROM orders o
+                                       GROUP BY o.customer_id)
+---
+---
 
