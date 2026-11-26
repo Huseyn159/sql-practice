@@ -142,3 +142,11 @@ WITH cte as(
     FROM products p
              JOIN categories c ON p.category_id = c.id)
 SELECT * FROM cte WHERE cte.dr = 1
+
+
+WITH cte as (
+    SELECT o.customer_id,o.id as last_paid_order,row_number() over (PARTITION BY o.customer_id ORDER BY o.created_at DESC) as rn
+    FROM orders o
+    WHERE o.status = 'paid'
+)
+SELECT * FROM cte WHERE rn = 1
