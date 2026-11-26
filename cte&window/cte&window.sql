@@ -47,9 +47,98 @@ SELECT o.id,full_name,
     o.created_at::date - LAG(o.created_at::date) OVER w AS gun
 FROM orders o
          JOIN customers c ON o.customer_id = c.id
-WINDOW w AS (PARTITION BY c.id ORDER BY o.created_at)
-
+WINDOW w AS (PARTITION BY c.id ORDER BY o.created_at);
 
 SELECT o.id,c.full_name,
        o.created_at::date as d,
-       LAG
+    LAG(o.created_at::date) OVER w AS prev,
+    LEAD(o.created_at::date) OVER w AS next,
+       o.created_at::date - LAG(o.created_at::date) OVER w AS prev_order,
+       LEAD(o.created_at::date)  OVER w - o.created_at::date AS next_order
+FROM orders o
+    JOIN customers c ON o.customer_id = c.id
+    WINDOW w AS(PARTITION BY c.id ORDER BY o.created_at)
+
+
+--Ödənilmiş sifarişlərin məbləğləri, tarixə görə sıralı.
+-- Hər birinin yanında: əvvəlki ödənilmiş sifarişdən çoxdursa 'artım', azdırsa 'azalma', əvvəlki yoxdursa 'ilk'.
+-- Bütün mağaza üzrə, müştəridən asılı olmayaraq.
+
+WITH paid_orders AS (
+    SELECT o.id,o.created_at,SUM(oi.qty*oi.unit_price) as cost
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.status = 'paid'
+    GROUP BY o.id,o.created_at)
+
+SELECT *,
+       CASE WHEN lag(cost) over w IS NULL THEN 'ilk'
+           WHEN (lag(cost) over w - cost) > 0  THEN 'azalma'
+           WHEN (lag(cost) over w - cost) < 0  THEN 'artim'
+           ELSE 'stabil' END as deyisiklik
+FROM paid_orders
+WINDOW w AS (ORDER BY created_at);
+
+WITH paid_totals AS (
+    SELECT o.id,o.created_at,SUM(oi.qty*oi.unit_price) as total
+    FROM orders o
+             JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.status = 'paid'
+    GROUP BY o.id,o.created_at)
+
+SELECT id, created_at::date, total,
+       SUM(total) OVER (ORDER BY created_at) AS cumulative
+FROM paid_totals;
+
+WITH paid_totals AS (
+    SELECT o.customer_id,o.id,o.created_at,SUM(oi.qty*oi.unit_price) as total
+    FROM orders o
+             JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.status = 'paid'
+    GROUP BY o.id,o.created_at)
+SELECT c.full_name,p.created_at::date,total,SUM(total) OVER (PARTITION BY c.id ORDER BY created_at::date)
+FROM paid_totals p
+         JOIN customers c ON p.customer_id = c.id;
+
+
+
+WITH paid_totals AS (
+    SELECT o.customer_id,o.id,o.created_at,SUM(oi.qty*oi.unit_price) as total
+    FROM orders o
+             JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.status = 'paid'
+    GROUP BY o.id,o.created_at)
+SELECT id,total,SUM(total) OVER (ORDER BY created_at ROWS BETWEEN 2 PRECEDING AND CURRENT ROW )
+FROM paid_totals;
+
+
+WITH paid_totals AS (
+    SELECT o.customer_id,o.id,o.created_at,SUM(oi.qty*oi.unit_price) as total
+    FROM orders o
+             JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.status = 'paid'
+    GROUP BY o.id,o.created_at),
+     windowed AS (
+         SELECT id,
+                ROUND(AVG(total) OVER w, 2) AS last_3_avg,
+                COUNT(*)              OVER w AS cnt
+         FROM paid_totals
+                  WINDOW w AS (ORDER BY created_at ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)
+    )
+SELECT id, last_3_avg
+FROM windowed
+WHERE cnt = 3;
+
+
+
+SELECT c.full_name,o.created_at::date,
+    o.created_at::date - lag(o.created_at::date)  OVER (PARTITION BY c.id ORDER BY o.created_at::date) ::date as diff
+FROM customers c
+         JOIN orders o on o.customer_id = c.id
+WHERE o.status = 'paid';
+
+WITH cte as(
+    SELECT p.name as product,c.name as category,p.price,dense_rank() OVER (PARTITION BY p.category_id ORDER BY p.price DESC) as dr
+    FROM products p
+             JOIN categories c ON p.category_id = c.id)
+SELECT * FROM cte WHERE cte.dr = 1
